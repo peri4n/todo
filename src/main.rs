@@ -52,6 +52,11 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    
+    // ensure the database is created
+    Sqlite::create_database("sqlite:tasks.db").await?;
+
+    // create a connection pool
     let pool = sqlx::sqlite::SqlitePool::connect("sqlite:tasks.db").await?;
 
     match &cli.command {
@@ -63,7 +68,6 @@ async fn main() -> Result<()> {
             println!("Done adding task: {}", name);
         },
         Some(Commands::Init) => {
-            Sqlite::create_database("tasks.db").await?;
             sqlx::query("CREATE TABLE tasks (id INTEGER PRIMARY KEY, name TEXT NOT NULL, done BOOLEAN NOT NULL DEFAULT 0)")
                 .execute(&pool)
                 .await?;
