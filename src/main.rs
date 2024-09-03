@@ -1,14 +1,15 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use sqlx::migrate::MigrateDatabase;
+use sqlx::types::chrono::NaiveDateTime;
 use sqlx::Sqlite;
 use std::path::PathBuf;
 
 #[derive(Debug, sqlx::FromRow)]
 struct Task {
-    id: i32,
     name: String,
     done: bool,
+    due: NaiveDateTime
 }
 
 #[derive(Parser)]
@@ -33,6 +34,10 @@ enum Commands {
         /// Name of the task
         #[arg(short, long)]
         name: String,
+
+        #[arg(short, long, value_parser(|v: &str| NaiveDateTime::parse_from_str(v, "%Y-%m-%dT%H:%M:%S")))]
+        due: NaiveDateTime
+
     },
 
     /// Init database
@@ -60,15 +65,19 @@ async fn main() -> Result<()> {
     let pool = sqlx::sqlite::SqlitePool::connect("sqlite:tasks.db").await?;
 
     match &cli.command {
-        Some(Commands::Add { name }) => {
-            sqlx::query("INSERT INTO tasks (name) VALUES (?)")
+        Some(Commands::Add { name , due}) => {
+            sqlx::query("INSERT INTO tasks (name, due) VALUES (?, ?)")
                 .bind(name)
+                .bind(due.to_string())
                 .execute(&pool)
                 .await?;
-            println!("Done adding task: {}", name);
         },
         Some(Commands::Init) => {
-            sqlx::query("CREATE TABLE tasks (id INTEGER PRIMARY KEY, name TEXT NOT NULL, done BOOLEAN NOT NULL DEFAULT 0)")
+            sqlx::query("CREATE TABLE tasks (
+                    id INTEGER PRIMARY KEY, 
+                    name TEXT NOT NULL, 
+                    done BOOLEAN NOT NULL DEFAULT 0,
+                    due DATE)")
                 .execute(&pool)
                 .await?;
             println!("Done initializing database");
@@ -79,7 +88,7 @@ async fn main() -> Result<()> {
                 .await?
                 .iter()
                 .for_each(|task| {
-                    println!("Task: {} (done: {})", task.name, task.done);
+                    println!("Task: {} (done: {}, due: {})", task.name, task.done, task.due.format("%Y-%m-%dT%H:%M:%S"));
                 });
             println!("Listing all tasks");
         },
