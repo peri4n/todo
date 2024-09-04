@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 clap = { version = "4.5.16", features = ["derive"] }
-sqlx = { version = "0.8.1", features = ["sqlite", "runtime-tokio", "chrono" ] }
+sqlx = { version = "0.8.1", features = ["sqlite", "runtime-tokio", "chrono", "macros" ] }
 tokio = { version = "1.40.0", features = ["full"] }
