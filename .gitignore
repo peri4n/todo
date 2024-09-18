@@ -19,3 +19,7 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+tasks.db
+tasks.db-shm
+tasks.db-wal
