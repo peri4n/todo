@@ -2,6 +2,8 @@ pub mod cli;
 pub mod tag;
 pub mod task;
 
+use comfy_table::presets::UTF8_BORDERS_ONLY;
+use comfy_table::*;
 use anyhow::Result;
 use clap::Parser;
 use cli::*;
@@ -29,9 +31,27 @@ async fn main() -> Result<()> {
             println!("Done initializing database");
         }
         Some(Commands::List) => {
+            let mut table = Table::new();
+            table.load_preset(UTF8_BORDERS_ONLY)
+                .set_content_arrangement(ContentArrangement::Dynamic)
+                .set_width(120)
+                .set_header(vec!["ID", "Name", "Due", "Finished", "Tags"]);
+
             fetch_tasks(&pool).await?.iter().for_each(|task: &Task| {
-                println!("{}", task);
+                table.add_row(vec![
+                    Cell::new(task.id.to_string()),
+                    Cell::new(task.name.clone()),
+                    Cell::new(task.due.format("%Y-%m-%d %H:%M:%S").to_string()),
+                    Cell::new(
+                        task.finished
+                            .map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string())
+                            .unwrap_or("".to_string()),
+                    ),
+                    Cell::new(task.tags.join(",")),
+                ]);
             });
+
+            println!("{}", table);
         }
         Some(Commands::Done { id }) => {
             finish_task(&pool, *id).await?;
