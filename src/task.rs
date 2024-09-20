@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use sqlx::types::chrono::NaiveDateTime;
 use sqlx::Row;
 
@@ -5,9 +7,24 @@ use sqlx::Row;
 pub struct Task {
     pub(crate) id: u32,
     pub(crate) name: String,
-    pub(crate) done: bool,
+    pub(crate) finished: Option<NaiveDateTime>,
     pub(crate) due: NaiveDateTime,
     pub(crate) tags: Vec<String>,
+}
+
+impl Display for Task {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&format!(
+            "Task {}: {} (due: {}, finished: {}, tags: {})",
+            self.id,
+            self.name,
+            self.due.format("%Y-%m-%d %H:%M:%S"),
+            self.finished
+                .map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string())
+                .unwrap_or("".to_string()),
+            self.tags.join(",")
+        ))
+    }
 }
 
 impl sqlx::FromRow<'_, sqlx::sqlite::SqliteRow> for Task {
@@ -15,8 +32,8 @@ impl sqlx::FromRow<'_, sqlx::sqlite::SqliteRow> for Task {
         Ok(Task {
             id: row.get("id"),
             name: row.get("name"),
-            done: row.get("done"),
-            due: NaiveDateTime::parse_from_str(row.get("due"), "%Y-%m-%d %H:%M:%S").unwrap(),
+            finished: NaiveDateTime::parse_from_str(row.get("finished_date"), "%Y-%m-%d %H:%M:%S").ok(),
+            due: NaiveDateTime::parse_from_str(row.get("due_date"), "%Y-%m-%d %H:%M:%S").unwrap(),
             tags: row
                 .get::<'_, String, &str>("tags")
                 .split(',')
@@ -30,7 +47,7 @@ pub async fn fetch_tasks(pool: &sqlx::SqlitePool) -> Result<Vec<Task>, sqlx::Err
     sqlx::query_as("
         SELECT tasks.*, GROUP_CONCAT(tags.name) AS tags  
         FROM tasks LEFT JOIN tagged ON tasks.id = tagged.task_id LEFT JOIN tags ON tagged.tag_id = tags.id
-        GROUP BY tasks.id, tasks.name, tasks.due, tasks.done")
+        GROUP BY tasks.id, tasks.name, tasks.due_date, tasks.finished_date")
         .fetch_all(pool)
         .await
 }
@@ -50,7 +67,7 @@ pub async fn create_task(
     name: &str,
     due: NaiveDateTime,
 ) -> Result<i64, sqlx::Error> {
-    sqlx::query("INSERT INTO tasks (name, due) VALUES (?, ?)")
+    sqlx::query("INSERT INTO tasks (name, due_date) VALUES (?, ?)")
         .bind(name)
         .bind(due)
         .execute(pool)
@@ -62,7 +79,7 @@ pub async fn finish_task(
     pool: &sqlx::SqlitePool,
     id: u32,
 ) -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
-    sqlx::query("UPDATE tasks SET done = 1 WHERE id = ?")
+    sqlx::query("UPDATE tasks SET finished_date = CURRENT_TIMESTAMP WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await

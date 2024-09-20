@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY, 
   name TEXT NOT NULL, 
-  done BOOLEAN NOT NULL DEFAULT FALSE,
-  due DATE
+  created_date TEXT,
+  finished_date TEXT,
+  due_date TEXT
 );
 
 CREATE TABLE IF NOT EXISTS tags (

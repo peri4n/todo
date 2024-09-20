@@ -30,19 +30,12 @@ async fn main() -> Result<()> {
         }
         Some(Commands::List) => {
             fetch_tasks(&pool).await?.iter().for_each(|task: &Task| {
-                println!(
-                    "Task {}: {} (done: {}, due: {}, tags: {})",
-                    task.id,
-                    task.name,
-                    task.done,
-                    task.due.format("%Y-%m-%dT%H:%M:%S"),
-                    task.tags.join(",")
-                );
+                println!("{}", task);
             });
         }
         Some(Commands::Done { id }) => {
             finish_task(&pool, *id).await?;
-            println!("Finishing task {}", id);
+            println!("Finished task {}", id);
         }
         Some(Commands::Tag { id, tag }) => {
             // check if task exists
