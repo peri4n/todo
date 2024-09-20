@@ -19,52 +19,30 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Some(Commands::Add { name, due }) => {
-            sqlx::query("INSERT INTO tasks (name, due) VALUES (?, ?)")
+            let result = sqlx::query("INSERT INTO tasks (name, due) VALUES (?, ?)")
                 .bind(name)
                 .bind(due.to_string())
                 .execute(&pool)
                 .await?;
+
+            println!("Task with id {} added", result.last_insert_rowid());
         }
         Some(Commands::Init) => {
-            sqlx::query(
-                "CREATE TABLE tasks (
-                    id INTEGER PRIMARY KEY, 
-                    name TEXT NOT NULL, 
-                    done BOOLEAN NOT NULL DEFAULT 0,
-                    due DATE);",
-            )
-            .execute(&pool)
-            .await?;
-
-            sqlx::query(
-                "CREATE TABLE tags (
-                        id INTEGER PRIMARY KEY, 
-                        name TEXT NOT NULL
-                    );",
-            )
-            .execute(&pool)
-            .await?;
-
-            sqlx::query(
-                "CREATE TABLE tagged (
-                task_id INTEGER,
-                tag_id INTEGER
-            );",
-            )
+            sqlx::query_file!("src/schema.sql")
             .execute(&pool)
             .await?;
             println!("Done initializing database");
         }
         Some(Commands::List) => {
-            sqlx::query_as::<_, Task>(r#"
+            sqlx::query_as("
                 SELECT tasks.*, GROUP_CONCAT(tags.name) AS tags  
                 FROM tasks LEFT JOIN tagged ON tasks.id = tagged.task_id LEFT JOIN tags ON tagged.tag_id = tags.id
-                GROUP BY tasks.id, tasks.name, tasks.due, tasks.done"#)
+                GROUP BY tasks.id, tasks.name, tasks.due, tasks.done")
                 .fetch_all(&pool)
                 .await?
                 .iter()
-                .for_each(|task| {
-                    println!("Task: {} (done: {}, due: {}, tags: {})", task.name, task.done, task.due.format("%Y-%m-%dT%H:%M:%S"), task.tags.join(", "));
+                .for_each(|task: &Task| {
+                    println!("Task {}: {} (done: {}, due: {}, tags: {})", task.id, task.name, task.done, task.due.format("%Y-%m-%dT%H:%M:%S"), task.tags.join(","));
                 });
             println!("Listing all tasks");
         }

@@ -47,6 +47,9 @@
           sqlite
         ];
 
+        # Environment variables
+        DATABASE_URL = "sqlite://tasks.db";
+
         shellHook = ''
           ${pkgs.rustToolchain}/bin/cargo --version
         '';
