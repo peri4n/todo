@@ -1,6 +1,6 @@
-use std::path::PathBuf;
-use sqlx::types::chrono::NaiveDateTime;
 use clap::{Parser, Subcommand};
+use sqlx::types::chrono::NaiveDateTime;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -26,8 +26,7 @@ pub enum Commands {
         name: String,
 
         #[arg(short, long, value_parser(|v: &str| NaiveDateTime::parse_from_str(v, "%Y-%m-%dT%H:%M:%S")))]
-        due: NaiveDateTime
-
+        due: NaiveDateTime,
     },
 
     /// Init database
@@ -35,12 +34,22 @@ pub enum Commands {
 
     /// Masks a task a done
     Done {
-        /// lists test values
+        /// Id of the task
         #[arg(short, long)]
-        name: String,
+        id: u32,
     },
 
     /// Lists all tasks
     List,
-}
 
+    /// Tag a task
+    Tag {
+        /// Id of the task
+        #[arg(short, long)]
+        id: u32,
+
+        /// Name of the tag
+        #[arg(short, long)]
+        tag: String,
+    },
+}

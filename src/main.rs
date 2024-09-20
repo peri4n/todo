@@ -1,11 +1,13 @@
 pub mod cli;
+pub mod tag;
 pub mod task;
 
 use anyhow::Result;
 use clap::Parser;
 use cli::*;
-use task::*;
 use sqlx::{migrate::MigrateDatabase, Sqlite};
+use tag::*;
+use task::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -19,39 +21,44 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Some(Commands::Add { name, due }) => {
-            let result = sqlx::query("INSERT INTO tasks (name, due) VALUES (?, ?)")
-                .bind(name)
-                .bind(due.to_string())
-                .execute(&pool)
-                .await?;
-
-            println!("Task with id {} added", result.last_insert_rowid());
+            let task_id = create_task(&pool, name, *due).await?;
+            println!("Task with id {} added", task_id);
         }
         Some(Commands::Init) => {
-            sqlx::query_file!("src/schema.sql")
-            .execute(&pool)
-            .await?;
+            sqlx::query_file!("src/schema.sql").execute(&pool).await?;
             println!("Done initializing database");
         }
         Some(Commands::List) => {
-            sqlx::query_as("
-                SELECT tasks.*, GROUP_CONCAT(tags.name) AS tags  
-                FROM tasks LEFT JOIN tagged ON tasks.id = tagged.task_id LEFT JOIN tags ON tagged.tag_id = tags.id
-                GROUP BY tasks.id, tasks.name, tasks.due, tasks.done")
-                .fetch_all(&pool)
-                .await?
-                .iter()
-                .for_each(|task: &Task| {
-                    println!("Task {}: {} (done: {}, due: {}, tags: {})", task.id, task.name, task.done, task.due.format("%Y-%m-%dT%H:%M:%S"), task.tags.join(","));
-                });
-            println!("Listing all tasks");
+            fetch_tasks(&pool).await?.iter().for_each(|task: &Task| {
+                println!(
+                    "Task {}: {} (done: {}, due: {}, tags: {})",
+                    task.id,
+                    task.name,
+                    task.done,
+                    task.due.format("%Y-%m-%dT%H:%M:%S"),
+                    task.tags.join(",")
+                );
+            });
         }
-        Some(Commands::Done { name }) => {
-            sqlx::query("UPDATE tasks SET done = 1 WHERE name = ?")
-                .bind(name)
-                .execute(&pool)
-                .await?;
-            println!("Finishing task: {}", name);
+        Some(Commands::Done { id }) => {
+            finish_task(&pool, *id).await?;
+            println!("Finishing task {}", id);
+        }
+        Some(Commands::Tag { id, tag }) => {
+            // check if task exists
+            if fetch_task_with_id(&pool, *id).await?.is_some() {
+                // check if the tag exists
+                if let Ok(tag_id) = fetch_tag_id_with_name(&pool, tag).await {
+                    tag_task(&pool, *id, tag_id).await?;
+                } else {
+                    // if not present create the tag
+                    let tag_id = create_tag(&pool, tag).await?;
+                    tag_task(&pool, *id, tag_id as u32).await?;
+                }
+            } else {
+                // task not present
+                return Err(anyhow::anyhow!("Task with id {} not found", id));
+            }
         }
         None => {
             println!("No command provided");
