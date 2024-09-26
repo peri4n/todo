@@ -95,10 +95,15 @@ pub async fn fetch_task_with_id(
     sqlx::query_as(
         "
         SELECT 
-            * 
-        FROM 
-            tasks 
-        WHERE id = ?",
+            tasks.*, GROUP_CONCAT(tags.name) AS tags  
+        FROM tasks 
+            LEFT JOIN tagged ON tasks.id = tagged.task_id 
+            LEFT JOIN tags ON tagged.tag_id = tags.id
+        WHERE 
+            tasks.id = ?
+        GROUP BY 
+            tasks.id, tasks.name, tasks.due_date, tasks.finished_date
+        ",
     )
     .bind(id)
     .fetch_optional(pool)

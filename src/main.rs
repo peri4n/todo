@@ -39,14 +39,14 @@ async fn main() -> Result<()> {
             }
             Commands::Tag { id, tag } => {
                 // check if task exists
-                if fetch_task_with_id(&pool, id).await?.is_some() {
+                if let Some(task) = fetch_task_with_id(&pool, id).await? {
                     // check if the tag exists
                     if let Ok(tag_id) = fetch_tag_id_with_name(&pool, &tag).await {
                         tag_task(&pool, id, tag_id).await?;
                     } else {
                         // if not present create the tag
                         let tag_id = create_tag(&pool, &tag).await?;
-                        tag_task(&pool, id, tag_id as u32).await?;
+                        tag_task(&pool, task.id, tag_id as u32).await?;
                     }
                 } else {
                     // task not present
